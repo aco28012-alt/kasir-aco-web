@@ -116,7 +116,15 @@ else:
         ket = st.text_input("Keterangan")
         nom = st.number_input("Nominal (Rp)", min_value=0, step=1000)
         if st.button("Simpan Pengeluaran", use_container_width=True):
-            payload = {"action": "save", "type": "pengeluaran", "waktu": waktu_sekarang().strftime("%Y-%m-%d %H:%M"), "kategori": kat, "keterangan": ket, "nominal": nom}
+            # CUKUP PAKAI waktu_sekarang() saja, jangan tambah .strftime lagi
+            payload = {
+                "action": "save", 
+                "type": "pengeluaran", 
+                "waktu": waktu_sekarang(), 
+                "kategori": kat, 
+                "keterangan": ket, 
+                "nominal": nom
+            }
             requests.post(URL_KASIR, data=json.dumps(payload))
             st.cache_data.clear()
             st.success("Tercatat!")
