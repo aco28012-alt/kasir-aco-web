@@ -80,14 +80,32 @@ else:
                 nama_plg = st.text_input("Nama Pelanggan")
                 if st.button("KONFIRMASI", type="primary", use_container_width=True):
                     if nama_plg:
+                        # 1. Ambil data keranjang ke variabel sementara
+                        pesanan_final = st.session_state.keranjang.copy()
+                        
+                        # 2. LANGSUNG kosongkan keranjang di layar (biar tidak tertekan 2x)
+                        st.session_state.keranjang = {}
+                        
                         with st.spinner("Menyimpan..."):
-                            jam_sekarang = waktu_sekarang()
-                            for item, qty in st.session_state.keranjang.items():
-                                payload = {"action": "save", "type": "kasir", "waktu": jam_sekarang, "pelanggan": nama_plg.upper(), "produk": item, "qty": qty, "harga": semua_harga[item], "total": semua_harga[item]*qty}
+                            jam_transaksi = waktu_sekarang()
+                            for item, qty in pesanan_final.items():
+                                payload = {
+                                    "action": "save", 
+                                    "type": "kasir", 
+                                    "waktu": jam_transaksi, 
+                                    "pelanggan": nama_plg.upper(), 
+                                    "produk": item, 
+                                    "qty": qty, 
+                                    "harga": semua_harga[item], 
+                                    "total": semua_harga[item]*qty
+                                }
                                 requests.post(URL_KASIR, data=json.dumps(payload))
+                            
                             st.cache_data.clear()
-                            reset_keranjang()
+                            st.success("Transaksi Berhasil!")
                             st.rerun()
+                    else: 
+                        st.warning("Isi nama pelanggan!")
                 if st.button("Reset Keranjang"): reset_keranjang(); st.rerun()
 
     elif pilihan == "💸 Pengeluaran":
