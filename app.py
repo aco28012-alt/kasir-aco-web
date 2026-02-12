@@ -59,7 +59,7 @@ else:
     if pilihan == "🛒 Kasir Pro":
         st.title("☕ Kasir Visual")
         col_m, col_p = st.columns([2, 1])
-       with col_m:
+        with col_m:
             tabs = st.tabs(list(menu.keys()))
             for i, kategori in enumerate(menu.keys()):
                 with tabs[i]:
