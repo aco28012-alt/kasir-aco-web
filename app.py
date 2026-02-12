@@ -2,7 +2,13 @@ import streamlit as st
 import requests
 import json
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+
+# Fungsi untuk ambil waktu lokal (WITA = UTC+8, WIB = UTC+7)
+# Jika Aco di Makassar (WITA), pakai hours=8
+# Jika Aco di Jakarta (WIB), pakai hours=7
+def waktu_sekarang():
+    return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
 
 # --- PENGATURAN DASAR ---
 PASSWORD_RAHASIA = "aco123" 
@@ -15,7 +21,7 @@ ID_SHEET = "1OmbEd5JtTdW82udZ28jpFWXjd4mexGO6_EB06_-8GPQ"
 URL_BACA_KASIR = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=2102782816"
 
-st.set_page_config(page_title="Kasir Pro Cafe Aco", layout="wide")
+st.set_page_config(page_title="Kasir Cultur Coffe", layout="wide")
 
 # --- DATA MENU (TERBARU) ---
 menu = {
@@ -89,7 +95,7 @@ else:
                                 payload = {
                                     "action": "save", 
                                     "type": "kasir", 
-                                    "waktu": datetime.now().strftime("%Y-%m-%d %H:%M"), 
+                                    "waktu": waktu_sekarang(), 
                                     "pelanggan": nama_plg.upper(), 
                                     "produk": item, 
                                     "qty": qty, 
@@ -110,7 +116,7 @@ else:
         ket = st.text_input("Keterangan")
         nom = st.number_input("Nominal (Rp)", min_value=0, step=1000)
         if st.button("Simpan Pengeluaran", use_container_width=True):
-            payload = {"action": "save", "type": "pengeluaran", "waktu": datetime.now().strftime("%Y-%m-%d %H:%M"), "kategori": kat, "keterangan": ket, "nominal": nom}
+            payload = {"action": "save", "type": "pengeluaran", "waktu": waktu_sekarang().strftime("%Y-%m-%d %H:%M"), "kategori": kat, "keterangan": ket, "nominal": nom}
             requests.post(URL_KASIR, data=json.dumps(payload))
             st.cache_data.clear()
             st.success("Tercatat!")
