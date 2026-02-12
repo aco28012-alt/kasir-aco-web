@@ -59,16 +59,19 @@ else:
     if pilihan == "🛒 Kasir Pro":
         st.title("☕ Kasir Visual")
         col_m, col_p = st.columns([2, 1])
-        with col_m:
+       with col_m:
             tabs = st.tabs(list(menu.keys()))
             for i, kategori in enumerate(menu.keys()):
                 with tabs[i]:
-                    cols = st.columns(2) # Lebih pas untuk layar HP
+                    cols = st.columns(2) 
                     for j, (item, harga) in enumerate(menu[kategori].items()):
                         with cols[j % 2]:
-                            if st.button(f"**{item}**\n\nRp {harga:,}", key=f"btn_{item}", use_container_width=True):
+                            # INI PERUBAHANNYA: Membuat kunci unik agar tidak error
+                            key_unik = f"btn_{kategori}_{item}".replace(" ", "_")
+                            
+                            if st.button(f"**{item}**\n\nRp {harga:,}", key=key_unik, use_container_width=True):
                                 tambah_ke_keranjang(item)
-                                st.toast(f"{item} ditambahkan!")
+                                st.toast(f"{item} masuk ke keranjang!")
         with col_p:
             st.subheader("🛒 Keranjang")
             if not st.session_state.keranjang: st.info("Pilih menu di samping")
