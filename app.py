@@ -9,9 +9,9 @@ def waktu_sekarang():
     return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
 
 # --- PENGATURAN DASAR ---
-PASSWORD_RAHASIA = "aco123" 
-URL_KASIR = "https://script.google.com/macros/s/AKfycbwqWChTAom4eWXCW_vLIggjId4Xilp7XnmC458mARcQqZs5NREsCCR_jg25hIQom3Ou/exec"
-ID_SHEET = "1OmbEd5JtTdW82udZ28jpFWXjd4mexGO6_EB06_-8GPQ"
+PASSWORD_RAHASIA = st.secrets["PASSWORD_RAHASIA"] 
+URL_KASIR = st.secrets["URL_KASIR"]
+ID_SHEET = st.secrets["ID_SHEET"]
 
 URL_BACA_KASIR = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=2102782816"
