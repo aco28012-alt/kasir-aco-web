@@ -13,13 +13,13 @@ PASSWORD_RAHASIA = st.secrets["PASSWORD_RAHASIA"]
 URL_KASIR = st.secrets["URL_KASIR"]
 ID_SHEET = st.secrets["ID_SHEET"]
 
-# URL GID milik Aco
+# GID milik Aco
 URL_BACA_KASIR = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=2102782816"
 URL_BACA_ARUSKAS = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1780397324"
 URL_BACA_JURNAL = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1597087749"
 
-st.set_page_config(page_title="Cultur Coffee - Management", layout="wide")
+st.set_page_config(page_title="Cultur Coffee - Pro Management", layout="wide")
 
 # --- DATA MENU ---
 menu = {
@@ -75,7 +75,7 @@ else:
                                 st.toast(f"{item} ditambahkan!")
         with col_p:
             st.subheader("🛒 Keranjang")
-            if not st.session_state.keranjang: st.info("Pilih menu di samping")
+            if not st.session_state.keranjang: st.info("Pilih menu")
             else:
                 total_bayar = sum(semua_harga[item] * qty for item, qty in st.session_state.keranjang.items())
                 for item, qty in st.session_state.keranjang.items():
@@ -88,16 +88,16 @@ else:
                     if nama_plg:
                         pesanan_final = st.session_state.keranjang.copy()
                         st.session_state.keranjang = {}
-                        with st.spinner("Mencatat Transaksi..."):
+                        with st.spinner("Mencatat..."):
                             jam_trx = waktu_sekarang()
                             for item, qty in pesanan_final.items():
-                                payload_kasir = {"action": "save", "type": "kasir", "waktu": jam_trx, "pelanggan": nama_plg, "produk": item, "qty": qty, "harga": semua_harga[item], "total": semua_harga[item]*qty}
-                                requests.post(URL_KASIR, data=json.dumps(payload_kasir))
+                                payload = {"action": "save", "type": "kasir", "waktu": jam_trx, "pelanggan": nama_plg, "produk": item, "qty": qty, "harga": semua_harga[item], "total": semua_harga[item]*qty}
+                                requests.post(URL_KASIR, data=json.dumps(payload))
                             
                             requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": "Penjualan", "keterangan": f"Order {nama_plg}", "masuk": total_bayar, "keluar": 0}))
                             requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": f"Penjualan {nama_plg}", "debit_akun": "Kas", "kredit_akun": "Pendapatan", "nilai": total_bayar}))
-                            st.cache_data.clear(); st.success("Berhasil Disimpan!"); st.rerun()
-                    else: st.warning("Nama pelanggan wajib diisi!")
+                            st.cache_data.clear(); st.success("Tersimpan!"); st.rerun()
+                    else: st.warning("Isi nama pelanggan!")
                 if st.button("Reset Keranjang"): reset_keranjang(); st.rerun()
 
     # --- HALAMAN PENGELUARAN ---
@@ -129,9 +129,9 @@ else:
             tab1, tab2, tab3, tab4 = st.tabs(["💰 Penjualan", "💸 Pengeluaran", "📈 Arus Kas", "📖 Jurnal Umum"])
             
             with tab1:
-                st.subheader("Filter Laporan Penjualan")
+                st.subheader("Laporan Penjualan")
                 df_k['waktu'] = pd.to_datetime(df_k['waktu'])
-                mode_jual = st.radio("Pilih Tampilan:", ["Harian", "Bulanan"], horizontal=True)
+                mode_jual = st.radio("Filter:", ["Harian", "Bulanan"], horizontal=True)
                 
                 if mode_jual == "Harian":
                     tgl_pilih = st.date_input("Tanggal", datetime.now() + timedelta(hours=8))
@@ -144,13 +144,11 @@ else:
                 st.metric("Total Omzet", f"Rp {df_res['total'].sum():,}")
                 st.dataframe(df_res, use_container_width=True)
 
-                # FITUR HAPUS TRANSAKSI
                 with st.expander("🗑️ Hapus Transaksi Terakhir"):
-                    st.warning("Hati-hati! Ini hanya menghapus di sheet Kasir.")
                     df_hapus = df_k.tail(5)
                     for i, row in df_hapus.iterrows():
                         c_txt, c_btn = st.columns([4, 1])
-                        c_txt.write(f"🕒 {row['waktu']} | {row['pelanggan']} | Rp {row['total']:,}")
+                        c_txt.write(f"{row['waktu']} | {row['pelanggan']} | Rp {row['total']:,}")
                         if c_btn.button("Hapus", key=f"del_{i}"):
                             requests.post(URL_KASIR, data=json.dumps({"action": "delete", "row_index": int(i)}))
                             st.cache_data.clear(); st.rerun()
@@ -166,10 +164,14 @@ else:
                     st.line_chart(df_ak.set_index('waktu')['Saldo_Berjalan'])
 
             with tab4:
+                st.subheader("Buku Jurnal Umum")
                 st.dataframe(df_j, use_container_width=True)
                 deb, kre = df_j['debit'].sum(), df_j['kredit'].sum()
                 st.write(f"**Debit:** Rp {deb:,} | **Kredit:** Rp {kre:,}")
-                st.success("Balance ✅") if deb == kre else st.error("Unbalanced ❌")
+                if deb == kre:
+                    st.success("Balance ✅")
+                else:
+                    st.error("Unbalanced ❌")
 
         except Exception as e:
-            st.warning("Data belum tersedia. Pastikan GID benar dan Sheet sudah ada isinya.")
+            st.warning("Data belum tersedia. Lakukan transaksi pertama!")
