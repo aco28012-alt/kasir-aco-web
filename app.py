@@ -13,7 +13,7 @@ PASSWORD_RAHASIA = st.secrets["PASSWORD_RAHASIA"]
 URL_KASIR = st.secrets["URL_KASIR"]
 ID_SHEET = st.secrets["ID_SHEET"]
 
-# URL dengan GID yang sudah diperbarui oleh Aco
+# URL GID milik Aco
 URL_BACA_KASIR = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=2102782816"
 URL_BACA_ARUSKAS = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1780397324"
@@ -88,7 +88,6 @@ else:
                     if nama_plg:
                         pesanan_final = st.session_state.keranjang.copy()
                         st.session_state.keranjang = {}
-                        
                         with st.spinner("Mencatat Transaksi..."):
                             jam_trx = waktu_sekarang()
                             for item, qty in pesanan_final.items():
@@ -97,10 +96,7 @@ else:
                             
                             requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": "Penjualan", "keterangan": f"Order {nama_plg}", "masuk": total_bayar, "keluar": 0}))
                             requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": f"Penjualan {nama_plg}", "debit_akun": "Kas", "kredit_akun": "Pendapatan", "nilai": total_bayar}))
-                            
-                            st.cache_data.clear()
-                            st.success("Berhasil Disimpan!")
-                            st.rerun()
+                            st.cache_data.clear(); st.success("Berhasil Disimpan!"); st.rerun()
                     else: st.warning("Nama pelanggan wajib diisi!")
                 if st.button("Reset Keranjang"): reset_keranjang(); st.rerun()
 
@@ -117,9 +113,8 @@ else:
                 requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "pengeluaran", "waktu": jam_trx, "kategori": kat, "keterangan": ket, "nominal": nom}))
                 requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": kat, "keterangan": ket, "masuk": 0, "keluar": nom}))
                 requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": ket, "debit_akun": f"Beban {kat}", "kredit_akun": "Kas", "nilai": nom}))
-                st.cache_data.clear()
-                st.success("Pengeluaran Tercatat!")
-            else: st.warning("Lengkapi data pengeluaran!")
+                st.cache_data.clear(); st.success("Pengeluaran Tercatat!")
+            else: st.warning("Lengkapi data!")
 
     # --- HALAMAN LAPORAN ---
     elif pilihan == "📋 Laporan Keuangan":
@@ -136,10 +131,7 @@ else:
             with tab1:
                 st.subheader("Filter Laporan Penjualan")
                 df_k['waktu'] = pd.to_datetime(df_k['waktu'])
-                
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    mode_jual = st.radio("Pilih Tampilan:", ["Harian", "Bulanan"], horizontal=True)
+                mode_jual = st.radio("Pilih Tampilan:", ["Harian", "Bulanan"], horizontal=True)
                 
                 if mode_jual == "Harian":
                     tgl_pilih = st.date_input("Tanggal", datetime.now() + timedelta(hours=8))
@@ -152,25 +144,32 @@ else:
                 st.metric("Total Omzet", f"Rp {df_res['total'].sum():,}")
                 st.dataframe(df_res, use_container_width=True)
 
+                # FITUR HAPUS TRANSAKSI
+                with st.expander("🗑️ Hapus Transaksi Terakhir"):
+                    st.warning("Hati-hati! Ini hanya menghapus di sheet Kasir.")
+                    df_hapus = df_k.tail(5)
+                    for i, row in df_hapus.iterrows():
+                        c_txt, c_btn = st.columns([4, 1])
+                        c_txt.write(f"🕒 {row['waktu']} | {row['pelanggan']} | Rp {row['total']:,}")
+                        if c_btn.button("Hapus", key=f"del_{i}"):
+                            requests.post(URL_KASIR, data=json.dumps({"action": "delete", "row_index": int(i)}))
+                            st.cache_data.clear(); st.rerun()
+
             with tab2:
-                st.subheader("Data Pengeluaran")
                 st.dataframe(df_p, use_container_width=True)
                 st.metric("Total Pengeluaran", f"Rp {df_p['nominal'].sum():,}")
 
             with tab3:
-                st.subheader("Laporan Arus Kas")
                 if not df_ak.empty:
                     df_ak['Saldo_Berjalan'] = df_ak['masuk'].cumsum() - df_ak['keluar'].cumsum()
                     st.dataframe(df_ak, use_container_width=True)
                     st.line_chart(df_ak.set_index('waktu')['Saldo_Berjalan'])
-                else: st.info("Data Arus Kas Kosong")
 
             with tab4:
-                st.subheader("Buku Jurnal Umum")
                 st.dataframe(df_j, use_container_width=True)
                 deb, kre = df_j['debit'].sum(), df_j['kredit'].sum()
                 st.write(f"**Debit:** Rp {deb:,} | **Kredit:** Rp {kre:,}")
                 st.success("Balance ✅") if deb == kre else st.error("Unbalanced ❌")
 
         except Exception as e:
-            st.warning("Pastikan Header di Google Sheets sudah diisi dan GID benar.")
+            st.warning("Data belum tersedia. Pastikan GID benar dan Sheet sudah ada isinya.")
