@@ -19,7 +19,7 @@ URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/expor
 URL_BACA_ARUSKAS = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1780397324"
 URL_BACA_JURNAL = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1597087749"
 
-st.set_page_config(page_title="Cultur Coffee - Pro Management", layout="wide")
+st.set_page_config(page_title="Cultur Coffee - Management", layout="wide")
 
 # --- DATA MENU ---
 menu = {
@@ -126,59 +126,76 @@ else:
             df_ak = pd.read_csv(f"{URL_BACA_ARUSKAS}&t={ts}")
             df_j = pd.read_csv(f"{URL_BACA_JURNAL}&t={ts}")
             
-            # Konversi waktu ke datetime
-            for df in [df_k, df_p, df_ak, df_j]:
-                df['waktu'] = pd.to_datetime(df['waktu'])
-                df['bulan_filter'] = df['waktu'].dt.strftime('%Y-%m')
-
-            # Filter Global di Sidebar
-            st.sidebar.divider()
-            st.sidebar.subheader("📅 Filter Periode")
-            all_months = sorted(df_ak['bulan_filter'].unique().tolist(), reverse=True)
-            
-            if all_months:
-                sel_month = st.sidebar.selectbox("Pilih Bulan Laporan:", all_months)
-                df_k_f = df_k[df_k['bulan_filter'] == sel_month]
-                df_p_f = df_p[df_p['bulan_filter'] == sel_month]
-                df_ak_f = df_ak[df_ak['bulan_filter'] == sel_month]
-                df_j_f = df_j[df_j['bulan_filter'] == sel_month]
-            else:
-                sel_month = "Data Kosong"
-                df_k_f, df_p_f, df_ak_f, df_j_f = df_k, df_p, df_ak, df_j
+            # Pre-processing waktu
+            for d in [df_k, df_p, df_ak, df_j]:
+                d['waktu'] = pd.to_datetime(d['waktu'])
 
             tab1, tab2, tab3, tab4 = st.tabs(["💰 Penjualan", "💸 Pengeluaran", "📈 Arus Kas", "📖 Jurnal Umum"])
             
+            # --- TAB PENJUALAN ---
             with tab1:
-                st.subheader(f"Penjualan Periode {sel_month}")
-                st.metric("Total Omzet", f"Rp {df_k_f['total'].sum():,}")
-                st.dataframe(df_k_f.drop(columns=['bulan_filter']), use_container_width=True)
+                st.subheader("Filter Penjualan")
+                m1 = st.radio("Tampilan Penjualan:", ["Harian", "Bulanan"], horizontal=True, key="m1")
+                if m1 == "Harian":
+                    t1 = st.date_input("Pilih Tanggal", datetime.now() + timedelta(hours=8), key="t1")
+                    df_res = df_k[df_k['waktu'].dt.date == t1]
+                else:
+                    b1 = st.selectbox("Pilih Bulan", df_k['waktu'].dt.to_period('M').unique(), key="b1")
+                    df_res = df_k[df_k['waktu'].dt.to_period('M') == b1]
+                
+                st.metric("Total Omzet", f"Rp {df_res['total'].sum():,}")
+                st.dataframe(df_res, use_container_width=True)
                 with st.expander("🗑️ Hapus Transaksi Terakhir"):
-                    df_hapus = df_k.tail(5)
-                    for i, row in df_hapus.iterrows():
-                        c_txt, c_btn = st.columns([4, 1])
-                        c_txt.write(f"{row['waktu']} | {row['pelanggan']} | Rp {row['total']:,}")
-                        if c_btn.button("Hapus", key=f"del_{i}"):
+                    for i, row in df_k.tail(5).iterrows():
+                        c_t, c_b = st.columns([4, 1])
+                        c_t.write(f"{row['waktu']} | {row['pelanggan']} | Rp {row['total']:,}")
+                        if c_b.button("Hapus", key=f"del_{i}"):
                             requests.post(URL_KASIR, data=json.dumps({"action": "delete", "row_index": int(i)}))
                             st.cache_data.clear(); st.rerun()
 
+            # --- TAB PENGELUARAN ---
             with tab2:
-                st.subheader(f"Pengeluaran Periode {sel_month}")
-                st.metric("Total Pengeluaran", f"Rp {df_p_f['nominal'].sum():,}")
-                st.dataframe(df_p_f.drop(columns=['bulan_filter']), use_container_width=True)
+                st.subheader("Filter Pengeluaran")
+                m2 = st.radio("Tampilan Pengeluaran:", ["Harian", "Bulanan"], horizontal=True, key="m2")
+                if m2 == "Harian":
+                    t2 = st.date_input("Pilih Tanggal", datetime.now() + timedelta(hours=8), key="t2")
+                    df_res_p = df_p[df_p['waktu'].dt.date == t2]
+                else:
+                    b2 = st.selectbox("Pilih Bulan", df_p['waktu'].dt.to_period('M').unique(), key="b2")
+                    df_res_p = df_p[df_p['waktu'].dt.to_period('M') == b2]
+                
+                st.metric("Total Pengeluaran", f"Rp {df_res_p['nominal'].sum():,}")
+                st.dataframe(df_res_p, use_container_width=True)
 
+            # --- TAB ARUS KAS ---
             with tab3:
-                st.subheader(f"Arus Kas Periode {sel_month}")
-                if not df_ak_f.empty:
-                    df_ak['Saldo_Berjalan'] = df_ak['masuk'].cumsum() - df_ak['keluar'].cumsum()
-                    df_ak_tampil = df_ak[df_ak['bulan_filter'] == sel_month]
-                    st.dataframe(df_ak_tampil.drop(columns=['bulan_filter']), use_container_width=True)
-                    st.line_chart(df_ak_tampil.set_index('waktu')['Saldo_Berjalan'])
-                else: st.info("Tidak ada data di bulan ini.")
+                st.subheader("Filter Arus Kas")
+                m3 = st.radio("Tampilan Arus Kas:", ["Harian", "Bulanan"], horizontal=True, key="m3")
+                if m3 == "Harian":
+                    t3 = st.date_input("Pilih Tanggal", datetime.now() + timedelta(hours=8), key="t3")
+                    df_res_ak = df_ak[df_ak['waktu'].dt.date == t3]
+                else:
+                    b3 = st.selectbox("Pilih Bulan", df_ak['waktu'].dt.to_period('M').unique(), key="b3")
+                    df_res_ak = df_ak[df_ak['waktu'].dt.to_period('M') == b3]
+                
+                if not df_res_ak.empty:
+                    df_res_ak['Saldo'] = df_res_ak['masuk'].cumsum() - df_res_ak['keluar'].cumsum()
+                    st.dataframe(df_res_ak, use_container_width=True)
+                    st.line_chart(df_res_ak.set_index('waktu')['Saldo'])
 
+            # --- TAB JURNAL ---
             with tab4:
-                st.subheader(f"Jurnal Umum Periode {sel_month}")
-                st.dataframe(df_j_f.drop(columns=['bulan_filter']), use_container_width=True)
-                deb, kre = df_j_f['debit'].sum(), df_j_f['kredit'].sum()
+                st.subheader("Filter Jurnal Umum")
+                m4 = st.radio("Tampilan Jurnal:", ["Harian", "Bulanan"], horizontal=True, key="m4")
+                if m4 == "Harian":
+                    t4 = st.date_input("Pilih Tanggal", datetime.now() + timedelta(hours=8), key="t4")
+                    df_res_j = df_j[df_j['waktu'].dt.date == t4]
+                else:
+                    b4 = st.selectbox("Pilih Bulan", df_j['waktu'].dt.to_period('M').unique(), key="b4")
+                    df_res_j = df_j[df_j['waktu'].dt.to_period('M') == b4]
+                
+                st.dataframe(df_res_j, use_container_width=True)
+                deb, kre = df_res_j['debit'].sum(), df_res_j['kredit'].sum()
                 st.write(f"**Debit:** Rp {deb:,} | **Kredit:** Rp {kre:,}")
                 if deb == kre: st.success("Balance ✅")
                 else: st.error("Unbalanced ❌")
