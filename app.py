@@ -126,26 +126,32 @@ else:
             df_ak = pd.read_csv(f"{URL_BACA_ARUSKAS}&t={ts}")
             df_j = pd.read_csv(f"{URL_BACA_JURNAL}&t={ts}")
             
-            # Konversi waktu agar bisa difilter
-            df_k['waktu'] = pd.to_datetime(df_k['waktu'])
-            df_p['waktu'] = pd.to_datetime(df_p['waktu'])
-            df_ak['waktu'] = pd.to_datetime(df_ak['waktu'])
-            df_j['waktu'] = pd.to_datetime(df_j['waktu'])
+            # Konversi waktu ke datetime
+            for df in [df_k, df_p, df_ak, df_j]:
+                df['waktu'] = pd.to_datetime(df['waktu'])
+                df['bulan_filter'] = df['waktu'].dt.strftime('%Y-%m')
 
-            # Filter Global Bulan (Digunakan oleh semua tab jika dipilih)
+            # Filter Global di Sidebar
             st.sidebar.divider()
-            st.sidebar.subheader("📅 Filter Global")
-            all_months = sorted(df_ak['waktu'].dt.to_period('M').unique().tolist(), reverse=True)
-            sel_month = st.sidebar.selectbox("Pilih Bulan Laporan:", all_months) if all_months else None
+            st.sidebar.subheader("📅 Filter Periode")
+            all_months = sorted(df_ak['bulan_filter'].unique().tolist(), reverse=True)
+            
+            if all_months:
+                sel_month = st.sidebar.selectbox("Pilih Bulan Laporan:", all_months)
+                df_k_f = df_k[df_k['bulan_filter'] == sel_month]
+                df_p_f = df_p[df_p['bulan_filter'] == sel_month]
+                df_ak_f = df_ak[df_ak['bulan_filter'] == sel_month]
+                df_j_f = df_j[df_j['bulan_filter'] == sel_month]
+            else:
+                sel_month = "Data Kosong"
+                df_k_f, df_p_f, df_ak_f, df_j_f = df_k, df_p, df_ak, df_j
 
             tab1, tab2, tab3, tab4 = st.tabs(["💰 Penjualan", "💸 Pengeluaran", "📈 Arus Kas", "📖 Jurnal Umum"])
             
             with tab1:
-                st.subheader(f"Laporan Penjualan - {sel_month}")
-                df_k_f = df_k[df_k['waktu'].dt.to_period('M') == sel_month] if sel_month else df_k
+                st.subheader(f"Penjualan Periode {sel_month}")
                 st.metric("Total Omzet", f"Rp {df_k_f['total'].sum():,}")
-                st.dataframe(df_k_f, use_container_width=True)
-
+                st.dataframe(df_k_f.drop(columns=['bulan_filter']), use_container_width=True)
                 with st.expander("🗑️ Hapus Transaksi Terakhir"):
                     df_hapus = df_k.tail(5)
                     for i, row in df_hapus.iterrows():
@@ -156,30 +162,26 @@ else:
                             st.cache_data.clear(); st.rerun()
 
             with tab2:
-                st.subheader(f"Laporan Pengeluaran - {sel_month}")
-                df_p_f = df_p[df_p['waktu'].dt.to_period('M') == sel_month] if sel_month else df_p
+                st.subheader(f"Pengeluaran Periode {sel_month}")
                 st.metric("Total Pengeluaran", f"Rp {df_p_f['nominal'].sum():,}")
-                st.dataframe(df_p_f, use_container_width=True)
+                st.dataframe(df_p_f.drop(columns=['bulan_filter']), use_container_width=True)
 
             with tab3:
-                st.subheader(f"Arus Kas - {sel_month}")
-                df_ak_f = df_ak[df_ak['waktu'].dt.to_period('M') == sel_month] if sel_month else df_ak
+                st.subheader(f"Arus Kas Periode {sel_month}")
                 if not df_ak_f.empty:
-                    df_ak_f['Saldo_Berjalan'] = df_ak_f['masuk'].cumsum() - df_ak_f['keluar'].cumsum()
-                    st.dataframe(df_ak_f, use_container_width=True)
-                    st.line_chart(df_ak_f.set_index('waktu')['Saldo_Berjalan'])
-                else: st.info("Tidak ada data arus kas di bulan ini.")
+                    df_ak['Saldo_Berjalan'] = df_ak['masuk'].cumsum() - df_ak['keluar'].cumsum()
+                    df_ak_tampil = df_ak[df_ak['bulan_filter'] == sel_month]
+                    st.dataframe(df_ak_tampil.drop(columns=['bulan_filter']), use_container_width=True)
+                    st.line_chart(df_ak_tampil.set_index('waktu')['Saldo_Berjalan'])
+                else: st.info("Tidak ada data di bulan ini.")
 
             with tab4:
-                st.subheader(f"Buku Jurnal Umum - {sel_month}")
-                df_j_f = df_j[df_j['waktu'].dt.to_period('M') == sel_month] if sel_month else df_j
-                st.dataframe(df_j_f, use_container_width=True)
+                st.subheader(f"Jurnal Umum Periode {sel_month}")
+                st.dataframe(df_j_f.drop(columns=['bulan_filter']), use_container_width=True)
                 deb, kre = df_j_f['debit'].sum(), df_j_f['kredit'].sum()
                 st.write(f"**Debit:** Rp {deb:,} | **Kredit:** Rp {kre:,}")
-                if deb == kre:
-                    st.success("Balance ✅")
-                else:
-                    st.error("Unbalanced ❌")
+                if deb == kre: st.success("Balance ✅")
+                else: st.error("Unbalanced ❌")
 
         except Exception as e:
-            st.warning("Data belum tersedia atau format header salah.")
+            st.error(f"Error: {e}")
