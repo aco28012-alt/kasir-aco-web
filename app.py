@@ -9,11 +9,11 @@ def waktu_sekarang():
     return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
 
 # --- PENGATURAN DASAR ---
-# Pastikan GID di bawah ini sesuai dengan GID di URL Google Sheets kamu
 PASSWORD_RAHASIA = st.secrets["PASSWORD_RAHASIA"] 
 URL_KASIR = st.secrets["URL_KASIR"]
 ID_SHEET = st.secrets["ID_SHEET"]
 
+# URL dengan GID yang sudah diperbarui oleh Aco
 URL_BACA_KASIR = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=2102782816"
 URL_BACA_ARUSKAS = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1780397324"
@@ -91,18 +91,12 @@ else:
                         
                         with st.spinner("Mencatat Transaksi..."):
                             jam_trx = waktu_sekarang()
-                            # 1. Simpan Detail ke Sheet Kasir
                             for item, qty in pesanan_final.items():
                                 payload_kasir = {"action": "save", "type": "kasir", "waktu": jam_trx, "pelanggan": nama_plg, "produk": item, "qty": qty, "harga": semua_harga[item], "total": semua_harga[item]*qty}
                                 requests.post(URL_KASIR, data=json.dumps(payload_kasir))
                             
-                            # 2. Simpan ke Arus Kas
-                            payload_arus = {"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": "Penjualan", "keterangan": f"Order {nama_plg}", "masuk": total_bayar, "keluar": 0}
-                            requests.post(URL_KASIR, data=json.dumps(payload_arus))
-
-                            # 3. Simpan ke Jurnal Umum (Debit Kas, Kredit Pendapatan)
-                            payload_jurnal = {"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": f"Penjualan {nama_plg}", "debit_akun": "Kas", "kredit_akun": "Pendapatan", "nilai": total_bayar}
-                            requests.post(URL_KASIR, data=json.dumps(payload_jurnal))
+                            requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": "Penjualan", "keterangan": f"Order {nama_plg}", "masuk": total_bayar, "keluar": 0}))
+                            requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": f"Penjualan {nama_plg}", "debit_akun": "Kas", "kredit_akun": "Pendapatan", "nilai": total_bayar}))
                             
                             st.cache_data.clear()
                             st.success("Berhasil Disimpan!")
@@ -120,18 +114,9 @@ else:
         if st.button("Simpan Pengeluaran", use_container_width=True):
             if ket and nom > 0:
                 jam_trx = waktu_sekarang()
-                # 1. Simpan ke Sheet Pengeluaran
-                payload_p = {"action": "save", "type": "pengeluaran", "waktu": jam_trx, "kategori": kat, "keterangan": ket, "nominal": nom}
-                requests.post(URL_KASIR, data=json.dumps(payload_p))
-                
-                # 2. Simpan ke Arus Kas
-                payload_a = {"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": kat, "keterangan": ket, "masuk": 0, "keluar": nom}
-                requests.post(URL_KASIR, data=json.dumps(payload_a))
-
-                # 3. Simpan ke Jurnal (Debit Beban, Kredit Kas)
-                payload_j = {"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": ket, "debit_akun": f"Beban {kat}", "kredit_akun": "Kas", "nilai": nom}
-                requests.post(URL_KASIR, data=json.dumps(payload_j))
-                
+                requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "pengeluaran", "waktu": jam_trx, "kategori": kat, "keterangan": ket, "nominal": nom}))
+                requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "aruskas", "waktu": jam_trx, "kategori": kat, "keterangan": ket, "masuk": 0, "keluar": nom}))
+                requests.post(URL_KASIR, data=json.dumps({"action": "save", "type": "jurnal", "waktu": jam_trx, "ket": ket, "debit_akun": f"Beban {kat}", "kredit_akun": "Kas", "nilai": nom}))
                 st.cache_data.clear()
                 st.success("Pengeluaran Tercatat!")
             else: st.warning("Lengkapi data pengeluaran!")
@@ -149,9 +134,23 @@ else:
             tab1, tab2, tab3, tab4 = st.tabs(["💰 Penjualan", "💸 Pengeluaran", "📈 Arus Kas", "📖 Jurnal Umum"])
             
             with tab1:
-                st.subheader("Data Penjualan")
-                st.dataframe(df_k, use_container_width=True)
-                st.metric("Total Omzet", f"Rp {df_k['total'].sum():,}")
+                st.subheader("Filter Laporan Penjualan")
+                df_k['waktu'] = pd.to_datetime(df_k['waktu'])
+                
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    mode_jual = st.radio("Pilih Tampilan:", ["Harian", "Bulanan"], horizontal=True)
+                
+                if mode_jual == "Harian":
+                    tgl_pilih = st.date_input("Tanggal", datetime.now() + timedelta(hours=8))
+                    df_res = df_k[df_k['waktu'].dt.date == tgl_pilih]
+                else:
+                    bulan_list = df_k['waktu'].dt.to_period('M').unique().tolist()
+                    bln_pilih = st.selectbox("Pilih Bulan", bulan_list) if bulan_list else None
+                    df_res = df_k[df_k['waktu'].dt.to_period('M') == bln_pilih] if bln_pilih else df_k
+
+                st.metric("Total Omzet", f"Rp {df_res['total'].sum():,}")
+                st.dataframe(df_res, use_container_width=True)
 
             with tab2:
                 st.subheader("Data Pengeluaran")
@@ -160,18 +159,18 @@ else:
 
             with tab3:
                 st.subheader("Laporan Arus Kas")
-                df_ak['Saldo_Berjalan'] = df_ak['masuk'].cumsum() - df_ak['keluar'].cumsum()
-                st.dataframe(df_ak, use_container_width=True)
-                st.line_chart(df_ak.set_index('waktu')['Saldo_Berjalan'])
+                if not df_ak.empty:
+                    df_ak['Saldo_Berjalan'] = df_ak['masuk'].cumsum() - df_ak['keluar'].cumsum()
+                    st.dataframe(df_ak, use_container_width=True)
+                    st.line_chart(df_ak.set_index('waktu')['Saldo_Berjalan'])
+                else: st.info("Data Arus Kas Kosong")
 
             with tab4:
                 st.subheader("Buku Jurnal Umum")
                 st.dataframe(df_j, use_container_width=True)
-                deb = df_j['debit'].sum(); kre = df_j['kredit'].sum()
-                st.write(f"**Total Debit:** Rp {deb:,} | **Total Kredit:** Rp {kre:,}")
-                if deb == kre: st.success("Balance ✅")
-                else: st.error("Unbalanced ❌")
+                deb, kre = df_j['debit'].sum(), df_j['kredit'].sum()
+                st.write(f"**Debit:** Rp {deb:,} | **Kredit:** Rp {kre:,}")
+                st.success("Balance ✅") if deb == kre else st.error("Unbalanced ❌")
 
         except Exception as e:
-            st.warning("Data belum tersedia atau URL Sheet salah.")
-            st.exception(e)
+            st.warning("Pastikan Header di Google Sheets sudah diisi dan GID benar.")
