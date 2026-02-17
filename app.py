@@ -16,8 +16,8 @@ ID_SHEET = st.secrets["ID_SHEET"]
 
 URL_BACA_KASIR = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 URL_BACA_PENGELUARAN = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=2102782816"
-URL_BACA_ARUSKAS = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=MASUKKAN_GID_ARUS_KAS_DISINI"
-URL_BACA_JURNAL = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=MASUKKAN_GID_JURNAL_DISINI"
+URL_BACA_ARUSKAS = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1780397324"
+URL_BACA_JURNAL = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=1597087749"
 
 st.set_page_config(page_title="Cultur Coffee - Management", layout="wide")
 
